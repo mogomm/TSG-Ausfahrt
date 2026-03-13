@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Fahrgemeinschaft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #EC6500;
+    --orange-light: #FFF3E8;
+    --orange-dark: #B34A00;
+    --green: #22C55E;
+    --green-light: #F0FDF4;
+    --green-dark: #166534;
+    --blue: #3B82F6;
+    --blue-light: #EFF6FF;
+    --blue-dark: #1D4ED8;
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-400: #9CA3AF;
+    --gray-600: #4B5563;
+    --gray-800: #1F2937;
+    --red: #EF4444;
+    --red-light: #FEF2F2;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--gray-50); color: var(--gray-800); min-height: 100vh; }
+  
+  /* ── App shell ── */
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: white; position: relative; }
+  
+  /* ── Header ── */
+  .header { background: var(--orange); padding: 16px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
+  .header-ball { font-size: 22px; line-height: 1; }
+  .header-title { font-size: 17px; font-weight: 600; color: white; }
+  .header-sub { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 1px; }
+  
+  /* ── Game banner ── */
+  .game-banner { background: var(--orange-light); border-bottom: 1px solid #F0C080; padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .game-dest { font-size: 15px; font-weight: 600; color: #7A3800; }
+  .game-meta { font-size: 12px; color: #A05000; margin-top: 2px; }
+  .game-time { text-align: right; }
+  .game-time-label { font-size: 10px; color: #A05000; text-transform: uppercase; letter-spacing: 0.05em; }
+  .game-time-value { font-size: 18px; font-weight: 600; color: #7A3800; }
+  
+  /* ── Deadline banner ── */
+  .deadline { background: var(--red-light); border-bottom: 1px solid #FCA5A5; padding: 8px 16px; font-size: 12px; color: #991B1B; display: flex; align-items: center; gap: 6px; }
+  .deadline-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); flex-shrink: 0; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  
+  /* ── Status bar ── */
+  .status-bar { margin: 12px 16px 4px; background: var(--gray-100); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; color: var(--gray-600); display: flex; align-items: center; gap: 6px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  
+  /* ── Section label ── */
+  .section-label { font-size: 10px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 16px 4px; }
+  
+  /* ── MY card (full edit) ── */
+  .my-card { margin: 12px 16px 4px; background: white; border-radius: var(--radius); border: 2px solid var(--orange); padding: 14px; }
+  .card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; font-family: 'DM Mono', monospace; }
+  .player-name { font-size: 16px; font-weight: 600; color: var(--gray-800); }
+  .player-addr { font-size: 11px; color: var(--gray-400); margin-top: 1px; }
+  .me-badge { display: inline-block; font-size: 10px; font-weight: 500; background: #FFF0E0; color: var(--orange); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  
+  /* ── Controls ── */
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toggle { font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 20px; border: 2px solid; cursor: pointer; transition: all 0.15s; white-space: nowrap; background: transparent; font-family: 'DM Sans', sans-serif; }
+  .toggle-pending { color: var(--gray-400); border-color: var(--gray-200); }
+  .toggle-pending:active { background: var(--gray-100); }
+  .toggle-driving { color: var(--green-dark); border-color: var(--green); background: var(--green-light); }
+  .toggle-riding  { color: var(--blue-dark);  border-color: var(--blue);  background: var(--blue-light);  }
+  
+  .seats-row { display: flex; align-items: center; gap: 6px; }
+  .seats-num { font-size: 14px; font-weight: 600; color: var(--gray-800); background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-family: 'DM Mono', monospace; min-width: 36px; text-align: center; }
+  .seats-num:hover { background: var(--gray-200); }
+  .seats-lbl { font-size: 13px; }
+  .seats-lbl-d { color: var(--green-dark); }
+  .seats-lbl-r { color: var(--blue-dark); }
+  
+  /* Dropdown */
+  .seats-dropdown { position: relative; display: inline-block; }
+  .seats-select { position: absolute; top: 100%; left: 0; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 20; min-width: 60px; overflow: hidden; display: none; }
+  .seats-select.open { display: block; }
+  .seats-option { padding: 8px 14px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Mono', monospace; }
+  .seats-option:hover { background: var(--gray-100); }
+  
+  .note-area { width: 100%; font-size: 12px; color: var(--gray-600); border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 8px 10px; background: transparent; margin-top: 10px; resize: none; font-family: 'DM Sans', sans-serif; line-height: 1.5; }
+  .note-area:focus { outline: none; border-color: var(--orange); }
+  
+  /* ── Assignment strip ── */
+  .assign-strip { margin-top: 10px; padding: 10px 12px; background: #FFFBEB; border-radius: var(--radius-sm); border: 1px solid #FCD34D; font-size: 13px; color: #92400E; line-height: 1.6; }
+  .assign-strip b { font-weight: 600; color: #7A3800; }
+  
+  /* ── Save button ── */
+  .save-btn { width: 100%; margin-top: 12px; padding: 11px; background: var(--orange); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
+  .save-btn:hover { opacity: 0.9; }
+  .save-btn:active { opacity: 0.8; transform: scale(0.99); }
+  .save-btn.saved { background: var(--green); }
+  
+  /* ── Compact rows (other players) ── */
+  .compact-row { margin: 0 16px 6px; background: white; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px; }
+  .compact-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; flex-shrink: 0; margin-top: 1px; font-family: 'DM Mono', monospace; }
+  .compact-main { flex: 1; min-width: 0; }
+  .compact-line { font-size: 13px; line-height: 1.5; }
+  .compact-name { font-weight: 600; color: var(--gray-800); }
+  .st-driving { color: var(--green-dark); }
+  .st-riding  { color: var(--blue-dark); }
+  .st-pending { color: var(--gray-400); }
+  .compact-note { font-size: 11px; color: var(--gray-400); margin-top: 2px; font-style: italic; }
+  .compact-assign { font-size: 11px; color: #A05000; margin-top: 3px; font-weight: 500; }
+  
+  /* ── No game screen ── */
+  .no-game { padding: 48px 24px; text-align: center; }
+  .no-game-icon { font-size: 48px; margin-bottom: 16px; }
+  .no-game-title { font-size: 18px; font-weight: 600; color: var(--gray-800); margin-bottom: 8px; }
+  .no-game-sub { font-size: 14px; color: var(--gray-400); line-height: 1.6; }
+  
+  /* ── Not in lineup ── */
+  .not-playing { margin: 24px 16px; background: var(--gray-100); border-radius: var(--radius); padding: 20px; text-align: center; }
+  .not-playing-icon { font-size: 32px; margin-bottom: 8px; }
+  .not-playing-text { font-size: 14px; color: var(--gray-600); line-height: 1.6; }
+  
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--gray-800); color: white; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 99; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  
+  /* ── Loading ── */
+  .loading { padding: 48px 24px; text-align: center; color: var(--gray-400); font-size: 14px; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--gray-200); border-top-color: var(--orange); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  .error-msg { margin: 16px; padding: 12px; background: var(--red-light); border-radius: var(--radius-sm); font-size: 13px; color: #991B1B; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="loading"><div class="spinner"></div>Wird geladen…</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG – passe diese URL an dein Backend an
+// ═══════════════════════════════════════════════════════════════════
+const API = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000/api'
+  : '/api';
+
+// ── Helpers ─────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const app = $('app');
+
+function toast(msg, ok = true) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#1F2937' : '#EF4444';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function initials(name) {
+  return name.trim().split(/\s+/).map(p => p[0]).join('').toUpperCase().slice(0, 2);
+}
+
+const AVATAR_COLORS = [
+  { bg: '#DBEAFE', fg: '#1E40AF' }, { bg: '#D1FAE5', fg: '#065F46' },
+  { bg: '#FEF3C7', fg: '#92400E' }, { bg: '#F3E8FF', fg: '#6B21A8' },
+  { bg: '#FCE7F3', fg: '#9D174D' }, { bg: '#FFEDD5', fg: '#9A3412' },
+  { bg: '#ECFDF5', fg: '#047857' }, { bg: '#FFF7ED', fg: '#C2410C' },
+];
+function avatarColor(name) {
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[h];
+}
+
+async function api(path, method = 'GET', body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'Fehler');
+  return data;
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+function deadlineCountdown(iso) {
+  const diff = new Date(iso) - new Date();
+  if (diff < 0) return 'Abgelaufen';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h > 24) return `${Math.floor(h/24)} Tage`;
+  if (h > 0) return `${h} Std. ${m} Min.`;
+  return `${m} Min.`;
+}
+
+// ── Main state ───────────────────────────────────────────────────────
+let me = null;
+let game = null;
+let lineup = [];
+let rsvps = {};
+let assignments = [];
+
+// ── Render ────────────────────────────────────────────────────────────
+function render() {
+  if (!game) {
+    app.innerHTML = `
+      <div class="header"><div class="header-ball">⚽</div>
+        <div><div class="header-title">Fahrgemeinschaft</div>
+        <div class="header-sub">FC Jugend</div></div></div>
+      <div class="no-game">
+        <div class="no-game-icon">🗓️</div>
+        <div class="no-game-title">Kein Spiel geplant</div>
+        <div class="no-game-sub">Schau bald wieder rein!<br>Wenn ein Spiel ansteht, wirst du hier informiert.</div>
+      </div>`;
+    return;
+  }
+
+  const inLineup = lineup.some(p => p.id === me?.id);
+  const pending = lineup.filter(p => (rsvps[p.id]?.mode || 'pending') === 'pending').length;
+  const showDeadline = game.rsvp_deadline && new Date(game.rsvp_deadline) > new Date();
+  const isPublished = game.status === 'published';
+
+  const myRsvp = rsvps[me?.id] || { mode: 'pending', seats_available: 2, seats_needed: 1, note: '' };
+  const myAssign = assignments.find(a => a.driver_player_id === me?.id || (a.rider_player_ids || []).includes(me?.id));
+
+  let html = `
+    <div class="header">
+      <div class="header-ball">⚽</div>
+      <div><div class="header-title">Fahrgemeinschaft</div>
+      <div class="header-sub">FC Jugend</div></div>
+    </div>
+    <div class="game-banner">
+      <div>
+        <div class="game-dest">${game.destination_name}</div>
+        <div class="game-meta">${formatDate(game.date)}</div>
+      </div>
+      <div class="game-time">
+        <div class="game-time-label">Anstoß</div>
+        <div class="game-time-value">${formatTime(game.date)}</div>
+      </div>
+    </div>`;
+
+  if (showDeadline) {
+    html += `<div class="deadline">
+      <div class="deadline-dot"></div>
+      Anmeldeschluss: ${formatDate(game.rsvp_deadline)}, ${formatTime(game.rsvp_deadline)}
+      &nbsp;·&nbsp; Noch ${deadlineCountdown(game.rsvp_deadline)}
+    </div>`;
+  }
+
+  if (!me || !inLineup) {
+    html += `<div class="not-playing">
+      <div class="not-playing-icon">👋</div>
+      <div class="not-playing-text">Du bist bei diesem Spiel nicht in der Aufstellung.<br>Viel Erfolg dem Team! ⚽</div>
+    </div>`;
+  } else {
+    // My card
+    const ac = avatarColor(me.name);
+    html += `<div class="section-label">Meine Rückmeldung</div>
+    <div class="my-card">
+      <div class="card-top">
+        <div class="avatar" style="background:${ac.bg};color:${ac.fg}">${initials(me.name)}</div>
+        <div style="flex:1">
+          <span class="player-name">${me.name}</span><span class="me-badge">Du</span>
+          <div class="player-addr">${me.address}</div>
+        </div>
+        ${me.has_car ? '<span style="font-size:18px">🚗</span>' : ''}
+      </div>
+      ${renderMyControls(myRsvp)}
+      ${isPublished && myAssign ? renderMyAssignment(myAssign) : ''}
+      <button class="save-btn" id="save-btn" onclick="saveRsvp()">Rückmeldung speichern</button>
+    </div>`;
+  }
+
+  // Status bar
+  if (pending > 0) {
+    html += `<div class="status-bar"><div class="status-dot" style="background:var(--orange)"></div>
+      ${pending} ${pending===1?'Familie hat':'Familien haben'} noch nicht geantwortet</div>`;
+  } else if (lineup.length > 0) {
+    html += `<div class="status-bar"><div class="status-dot" style="background:var(--green)"></div>
+      Alle haben geantwortet</div>`;
+  }
+
+  // Other players
+  const others = lineup.filter(p => p.id !== me?.id);
+  if (others.length) {
+    html += `<div class="section-label">Alle Spieler</div>`;
+    for (const p of others) {
+      const r = rsvps[p.id] || { mode: 'pending' };
+      const ac2 = avatarColor(p.name);
+      const assign = assignments.find(a => a.driver_player_id === p.id || (a.rider_player_ids||[]).includes(p.id));
+      let statusText = '';
+      if (r.mode === 'driving') statusText = `<span class="st-driving"> fährt · ${r.seats_available||2} Platz${(r.seats_available||2)>1?'e':''} frei</span>`;
+      else if (r.mode === 'riding') statusText = `<span class="st-riding"> sucht ${r.seats_needed||1} Platz${(r.seats_needed||1)>1?'e':''}</span>`;
+      else statusText = `<span class="st-pending"> – noch keine Angabe</span>`;
+
+      let assignText = '';
+      if (isPublished && assign) {
+        const driver = lineup.find(x => x.id === assign.driver_player_id);
+        if (p.id === assign.driver_player_id) {
+          const rNames = (assign.rider_player_ids||[]).map(rid=>lineup.find(x=>x.id===rid)?.name).filter(Boolean).join(', ');
+          if (rNames) assignText = `🚗 Nimmt mit: ${rNames} · Treffpunkt: ${assign.meetup_address}`;
+        } else {
+          assignText = `📍 Fährt mit ${driver?.name||'?'} · ${assign.meetup_address}`;
+        }
+      }
+
+      html += `<div class="compact-row">
+        <div class="compact-av" style="background:${ac2.bg};color:${ac2.fg}">${initials(p.name)}</div>
+        <div class="compact-main">
+          <div class="compact-line"><span class="compact-name">${p.name}</span>${statusText}</div>
+          ${r.note ? `<div class="compact-note">"${r.note}"</div>` : ''}
+          ${assignText ? `<div class="compact-assign">${assignText}</div>` : ''}
+        </div>
+      </div>`;
+    }
+  }
+
+  html += '<div style="height:32px"></div>';
+  app.innerHTML = html;
+
+  // Restore dropdown state
+  window._mySeats = myRsvp.seats_available || 2;
+  window._myNeed  = myRsvp.seats_needed  || 1;
+  window._myNote  = myRsvp.note || '';
+  window._myMode  = myRsvp.mode || 'pending';
+}
+
+function renderMyControls(r) {
+  const mode = r.mode || 'pending';
+  let label, cls;
+  if (mode==='driving'){label='Wir fahren';cls='toggle-driving';}
+  else if(mode==='riding'){label='Wir wollen mit';cls='toggle-riding';}
+  else{label='Noch offen';cls='toggle-pending';}
+
+  let seatsHtml = '';
+  if (mode==='driving') {
+    const s = r.seats_available || 2;
+    seatsHtml = `<div class="seats-row">
+      <span class="seats-lbl seats-lbl-d">mit</span>
+      <div class="seats-dropdown">
+        <div class="seats-num" onclick="toggleDropdown('dd-d')">${s}</div>
+        <div class="seats-select" id="dd-d">
+          ${[1,2,3,4,5].map(n=>`<div class="seats-option" onclick="pickSeat(${n},'dd-d')">${n}</div>`).join('')}
+        </div>
+      </div>
+      <span class="seats-lbl seats-lbl-d">Plätzen frei</span>
+    </div>`;
+  } else if (mode==='riding') {
+    const n = r.seats_needed || 1;
+    seatsHtml = `<div class="seats-row">
+      <span class="seats-lbl seats-lbl-r">und suchen</span>
+      <div class="seats-dropdown">
+        <div class="seats-num" onclick="toggleDropdown('dd-r')">${n}</div>
+        <div class="seats-select" id="dd-r">
+          ${[1,2,3].map(x=>`<div class="seats-option" onclick="pickNeed(${x},'dd-r')">${x}</div>`).join('')}
+        </div>
+      </div>
+      <span class="seats-lbl seats-lbl-r">Platz/Plätze</span>
+    </div>`;
+  }
+
+  return `<div class="controls">
+    <button class="toggle ${cls}" onclick="toggleMode()">${label}</button>
+    ${seatsHtml}
+  </div>
+  <textarea class="note-area" rows="1" id="note-area"
+    placeholder="Notiz (z.B. Können erst 10:15 Uhr)…"
+    oninput="window._myNote=this.value">${r.note||''}</textarea>`;
+}
+
+function renderMyAssignment(a) {
+  const driver = lineup.find(p => p.id === a.driver_player_id);
+  if (me.id === a.driver_player_id) {
+    const names = (a.rider_player_ids||[]).map(rid=>lineup.find(p=>p.id===rid)?.name).filter(Boolean).join(', ');
+    return `<div class="assign-strip">🚗 Ihr nehmt mit: <b>${names||'niemanden'}</b><br>
+      Treffpunkt: <b>${a.meetup_address}</b></div>`;
+  } else {
+    const typ = a.meetup_type === 'at_driver' ? 'Ihr kommt zu' : 'Ihr werdet abgeholt von';
+    return `<div class="assign-strip">📍 ${typ}: <b>${driver?.name||'?'}</b><br>
+      Treffpunkt: <b>${a.meetup_address}</b></div>`;
+  }
+}
+
+// ── Interactions ──────────────────────────────────────────────────────
+function toggleMode() {
+  const modes = ['pending','driving','riding'];
+  window._myMode = modes[(modes.indexOf(window._myMode)+1)%3];
+  if (window._myMode==='driving' && !window._mySeats) window._mySeats = 2;
+  if (window._myMode==='riding'  && !window._myNeed)  window._myNeed  = 1;
+  const myRsvp = { mode:window._myMode, seats_available:window._mySeats, seats_needed:window._myNeed, note:window._myNote };
+  // Re-render just my card controls area
+  const card = document.querySelector('.my-card');
+  if (card) {
+    const ctrl = card.querySelector('.controls');
+    if (ctrl) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = renderMyControls(myRsvp);
+      ctrl.outerHTML = tmp.firstChild.outerHTML;
+    }
+  }
+  render();
+}
+
+function toggleDropdown(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+  document.addEventListener('click', function close(e) {
+    if (!e.target.closest('.seats-dropdown')) {
+      if (el) el.classList.remove('open');
+      document.removeEventListener('click', close);
+    }
+  }, { once: false });
+}
+
+function pickSeat(n, ddId) {
+  window._mySeats = n;
+  const dd = document.getElementById(ddId);
+  if (dd) { dd.previousElementSibling.textContent = n; dd.classList.remove('open'); }
+}
+function pickNeed(n, ddId) {
+  window._myNeed = n;
+  const dd = document.getElementById(ddId);
+  if (dd) { dd.previousElementSibling.textContent = n; dd.classList.remove('open'); }
+}
+
+async function saveRsvp() {
+  const btn = $('save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Wird gespeichert…'; }
+  try {
+    const note = $('note-area')?.value || window._myNote || '';
+    await api(`/games/${game.id}/rsvps`, 'POST', {
+      player_id: me.id,
+      mode: window._myMode || 'pending',
+      seats_available: window._mySeats || 2,
+      seats_needed: window._myNeed || 1,
+      note
+    });
+    // Reload rsvps
+    await loadRsvps();
+    toast('✓ Gespeichert!');
+    if (btn) { btn.classList.add('saved'); btn.textContent = '✓ Gespeichert'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Rückmeldung speichern'; btn.disabled=false; }, 2000); }
+  } catch(e) {
+    toast(e.message, false);
+    if (btn) { btn.disabled=false; btn.textContent='Rückmeldung speichern'; }
+  }
+}
+
+// ── Data loading ──────────────────────────────────────────────────────
+async function loadRsvps() {
+  if (!game) return;
+  const data = await api(`/games/${game.id}/rsvps`);
+  rsvps = Object.fromEntries(data.map(r => [r.player_id, r]));
+}
+
+async function init() {
+  // Get magic token from URL
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token') || params.get('user');
+
+  try {
+    // Load current game
+    game = await api('/games/current');
+
+    if (game) {
+      [lineup, , assignments] = await Promise.all([
+        api(`/games/${game.id}/lineup`),
+        loadRsvps(),
+        api(`/games/${game.id}/assignments`)
+      ]);
+    }
+
+    // Load player by token
+    if (token) {
+      try { me = await api(`/me/${token}`); } catch(e) { me = null; }
+    }
+
+    // Poll every 30s
+    setInterval(async () => {
+      await loadRsvps();
+      if (game) assignments = await api(`/games/${game.id}/assignments`);
+      render();
+    }, 30000);
+
+    render();
+  } catch(e) {
+    app.innerHTML = `<div class="error-msg">Fehler beim Laden: ${e.message}</div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
