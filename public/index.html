@@ -211,6 +211,7 @@ let game = null;
 let lineup = [];
 let rsvps = {};
 let assignments = [];
+let playerDefaults = null;
 
 // ── Render ────────────────────────────────────────────────────────────
 function render() {
@@ -233,7 +234,10 @@ function render() {
   const showDeadline = game.rsvp_deadline && new Date(game.rsvp_deadline) > new Date();
   const isPublished = game.status === 'published';
 
-  const myRsvp = rsvps[me?.id] || { mode: 'pending', seats_available: 2, seats_needed: 1, note: '' };
+  const rawRsvp = rsvps[me?.id] || { mode: 'pending', seats_available: 2, seats_needed: 1, note: '' };
+  const myRsvp = (rawRsvp.mode === 'pending' && playerDefaults?.mode && playerDefaults.mode !== 'pending')
+    ? { ...rawRsvp, mode: playerDefaults.mode, seats_available: playerDefaults.seats_available || 2, seats_needed: playerDefaults.seats_needed || 1 }
+    : rawRsvp;
   const myAssign = assignments.find(a => a.driver_player_id === me?.id || (a.rider_player_ids || []).includes(me?.id));
 
   let html = `
@@ -379,7 +383,10 @@ function renderMyControls(r) {
   </div>
   <textarea class="note-area" rows="1" id="note-area"
     placeholder="Notiz (z.B. Können erst 10:15 Uhr)…"
-    oninput="window._myNote=this.value">${r.note||''}</textarea>`;
+    oninput="window._myNote=this.value">${r.note||''}</textarea>
+  <label style="font-size:12px;color:var(--gray-600);display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer">
+    <input type="checkbox" id="save-as-default"> Als Standard für zukünftige Spiele speichern
+  </label>`;
 }
 
 function renderMyAssignment(a) {
@@ -459,6 +466,7 @@ async function saveRsvp() {
   if (btn) { btn.disabled = true; btn.textContent = 'Wird gespeichert…'; }
   try {
     const note = $('note-area')?.value || window._myNote || '';
+    const saveDefault = $('save-as-default')?.checked;
     await api(`/games/${game.id}/rsvps`, 'POST', {
       player_id: me.id,
       mode: window._myMode || 'pending',
@@ -466,6 +474,14 @@ async function saveRsvp() {
       seats_needed: window._myNeed || 1,
       note
     });
+    if (saveDefault) {
+      await api(`/players/${me.id}/defaults`, 'POST', {
+        default_mode: window._myMode,
+        default_seats_available: window._mySeats,
+        default_seats_needed: window._myNeed
+      });
+      playerDefaults = { mode: window._myMode, seats_available: window._mySeats, seats_needed: window._myNeed };
+    }
     // Reload rsvps
     await loadRsvps();
     toast('✓ Gespeichert!');
@@ -503,6 +519,14 @@ async function init() {
     // Load player by token
     if (token) {
       try { me = await api(`/me/${token}`); } catch(e) { me = null; }
+    }
+
+    // If player has no confirmed RSVP for this game, load saved defaults
+    if (me && game) {
+      const myRsvp = rsvps[me.id];
+      if (!myRsvp || myRsvp.mode === 'pending') {
+        try { playerDefaults = await api(`/players/${me.id}/defaults`); } catch(e) {}
+      }
     }
 
     // Poll every 30s

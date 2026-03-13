@@ -209,6 +209,32 @@ app.patch('/api/players/:id', async (req, res) => {
   res.json(data);
 });
 
+// ── Player defaults ───────────────────────────────────────────────────────────
+
+app.get('/api/players/:id/defaults', async (req, res) => {
+  const { data, error } = await supabase
+    .from('players')
+    .select('default_mode, default_seats_available, default_seats_needed')
+    .eq('id', req.params.id)
+    .single();
+  if (error || !data) return res.status(404).json({ error: 'Nicht gefunden' });
+  res.json({
+    mode: data.default_mode || 'pending',
+    seats_available: data.default_seats_available || 2,
+    seats_needed: data.default_seats_needed || 1
+  });
+});
+
+app.post('/api/players/:id/defaults', async (req, res) => {
+  const { default_mode, default_seats_available, default_seats_needed } = req.body;
+  const { error } = await supabase
+    .from('players')
+    .update({ default_mode, default_seats_available, default_seats_needed })
+    .eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
 // ── Player by magic token (public) ───────────────────────────────────────────
 app.get('/api/me/:token', async (req, res) => {
   const { data, error } = await supabase
