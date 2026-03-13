@@ -184,6 +184,31 @@ app.delete('/api/players/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Update player ────────────────────────────────────────────────────────────
+app.patch('/api/players/:id', async (req, res) => {
+  const { name, address, phone, has_car, regeocode } = req.body;
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (phone !== undefined) updates.phone = phone;
+  if (has_car !== undefined) updates.has_car = has_car;
+  if (address !== undefined) {
+    updates.address = address;
+    if (regeocode) {
+      try {
+        const { lat, lng } = await geocode(address);
+        updates.lat = lat;
+        updates.lng = lng;
+      } catch(e) {
+        return res.status(400).json({ error: `Adresse nicht gefunden: ${address}` });
+      }
+    }
+  }
+  const { data, error } = await supabase
+    .from('players').update(updates).eq('id', req.params.id).select().maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // ── Player by magic token (public) ───────────────────────────────────────────
 app.get('/api/me/:token', async (req, res) => {
   const { data, error } = await supabase
