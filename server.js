@@ -337,19 +337,31 @@ app.post('/api/games/:id/calculate', async (req, res) => {
   const rsvpMap = Object.fromEntries(rsvpRows.map(r => [r.player_id, r]));
 
   const drivers = lineupPlayers
-    .filter(p => rsvpMap[p.id]?.mode === 'driving')
+    .filter(p => {
+      const mode = rsvpMap[p.id]?.mode;
+      // Explicitly driving, OR has a car and hasn't responded yet (default: drives)
+      return mode === 'driving' || (!mode || mode === 'pending') && p.has_car;
+    })
     .map(p => ({ ...p, seats_available: rsvpMap[p.id]?.seats_available || 2 }));
 
   const riders = lineupPlayers
     .filter(p => rsvpMap[p.id]?.mode === 'riding')
     .map(p => ({ ...p, seats_needed: rsvpMap[p.id]?.seats_needed || 1 }));
 
+  // Players with no car and no response are also treated as riders needing 1 seat
+  const pendingNocar = lineupPlayers.filter(p => {
+    const mode = rsvpMap[p.id]?.mode;
+    return (!mode || mode === 'pending') && !p.has_car;
+  }).map(p => ({ ...p, seats_needed: 1 }));
+
+  const allRiders = [...riders, ...pendingNocar];
+
   const dest = { lat: game.dest_lat, lng: game.dest_lng };
 
-  if (!drivers.length) return res.status(400).json({ error: 'Keine Fahrer eingetragen' });
+  if (!drivers.length) return res.status(400).json({ error: 'Keine Fahrer gefunden – bitte mindestens einen Spieler mit Auto in der Aufstellung' });
 
   // Compute
-  const groups = await computeGroups(drivers, riders, dest);
+  const groups = await computeGroups(drivers, allRiders, dest);
 
   // Delete old assignments
   await supabase.from('assignments').delete().eq('game_id', gameId);
