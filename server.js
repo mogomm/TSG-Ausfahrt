@@ -236,9 +236,24 @@ app.post('/api/games', async (req, res) => {
 });
 
 app.patch('/api/games/:id', async (req, res) => {
-  const { status, player_ids } = req.body;
+  const { status, player_ids, destination_name, destination_address, date, rsvp_deadline } = req.body;
   const updates = {};
   if (status) updates.status = status;
+  if (destination_name) updates.destination_name = destination_name;
+  if (date) updates.date = date;
+  if (rsvp_deadline !== undefined) updates.rsvp_deadline = rsvp_deadline;
+
+  // Re-geocode if address changed
+  if (destination_address) {
+    updates.destination_address = destination_address;
+    try {
+      const { lat, lng } = await geocode(destination_address);
+      updates.dest_lat = lat;
+      updates.dest_lng = lng;
+    } catch(e) {
+      return res.status(400).json({ error: `Adresse nicht gefunden: ${destination_address}` });
+    }
+  }
 
   const { data, error } = await supabase
     .from('games').update(updates).eq('id', req.params.id).select().single();
