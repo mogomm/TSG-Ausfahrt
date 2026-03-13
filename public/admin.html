@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --orange: #EC6500; --orange-light: #FFF3E8;
+    --orange: #CC0000; --orange-light: #FFF0F0;
     --green: #22C55E; --green-light: #F0FDF4; --green-dark: #166534;
     --red: #EF4444; --red-light: #FEF2F2;
     --gray-50:#F9FAFB; --gray-100:#F3F4F6; --gray-200:#E5E7EB;
@@ -138,9 +138,10 @@
 <div class="wrap" id="admin-app" style="display:none">
   <div class="header">
     <div class="header-left">
+      <img src="https://next.fussball.de/_next/image?url=https:%2F%2Fwww.fussball.de%2Fprofile-service%2Fv1%2Fclub-profile%2F00ES8GN9V800001LVV0AG08LVUPGND5I%2Flogo&w=640&q=100" alt="TSG Logo" style="width:36px;height:36px;object-fit:contain;flex-shrink:0;">
       <div>
-        <div class="header-title">⚽ Admin</div>
-        <div class="header-sub">Fahrgemeinschaft</div>
+        <div class="header-title">Admin</div>
+        <div class="header-sub">TSG Darmstadt · Fahrgemeinschaft</div>
       </div>
     </div>
     <button class="logout-btn" onclick="logout()">Ausloggen</button>
@@ -238,7 +239,7 @@ let adminToken = localStorage.getItem('admin_token') || '';
 let players = [], currentGame = null, lineup = [], rsvps = [], assignments = [];
 
 const GROUP_COLORS = [
-  { bg:'#FFF7ED', border:'#FCD34D', title:'#92400E' },
+  { bg:'#FFF0F0', border:'#FFAAAA', title:'#880000' },
   { bg:'#F0FDF4', border:'#86EFAC', title:'#15803D' },
   { bg:'#EFF6FF', border:'#93C5FD', title:'#1D4ED8' },
   { bg:'#F5F3FF', border:'#C4B5FD', title:'#6D28D9' },
@@ -399,13 +400,43 @@ function renderCurrentGame() {
     <div style="margin-top:8px"><span class="badge ${statusBadge}">${statusLabel}</span>
     <span style="font-size:12px;color:var(--gray-400);margin-left:8px">${lineup.length} Spieler in der Aufstellung</span></div>`;
 
+  // Aufstellung bearbeiten
+  const lineupIds = new Set(lineup.map(p=>p.id));
+  const lineupCheckboxes = players.map(p=>`
+    <label class="lineup-item">
+      <input type="checkbox" value="${p.id}" ${lineupIds.has(p.id)?'checked':''} onchange="updateLineup()">
+      ${p.name} ${p.has_car?'🚗':''}
+    </label>`).join('');
+  document.getElementById('current-game-info').innerHTML += `
+    <div style="margin-top:14px;border-top:1px solid var(--gray-200);padding-top:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:8px">Aufstellung bearbeiten</div>
+      <div class="lineup-grid" id="current-lineup-grid">${lineupCheckboxes}</div>
+      <button class="btn btn-primary" style="margin-top:10px" id="lineup-save-btn" onclick="saveLineup()">Aufstellung speichern</button>
+      <span id="lineup-saved-msg" style="display:none;font-size:12px;color:var(--green-dark);margin-left:10px">✓ Gespeichert</span>
+    </div>`;
+
   const actions=document.getElementById('game-actions');
   actions.innerHTML='';
-  if(currentGame.status==='open'){
+  if(currentGame.status==='open'||currentGame.status==='calculated'){
     actions.innerHTML=`<button class="btn btn-outline" onclick="archiveGame()">Spiel archivieren</button>`;
   } else if(currentGame.status==='published') {
     actions.innerHTML=`<button class="btn btn-outline" onclick="archiveGame()">Archivieren</button>`;
   }
+}
+
+async function saveLineup() {
+  const checked = [...document.querySelectorAll('#current-lineup-grid input:checked')].map(i=>i.value);
+  const btn = document.getElementById('lineup-save-btn');
+  btn.disabled=true; btn.textContent='Speichert…';
+  try {
+    await api(`/games/${currentGame.id}`,'PATCH',{ player_ids: checked });
+    lineup = await api(`/games/${currentGame.id}/lineup`);
+    renderRsvpOverview();
+    const msg = document.getElementById('lineup-saved-msg');
+    if(msg){ msg.style.display='inline'; setTimeout(()=>msg.style.display='none', 2500); }
+    toast('✓ Aufstellung gespeichert');
+  } catch(e){ toast(e.message, false); }
+  btn.disabled=false; btn.textContent='Aufstellung speichern';
 }
 
 async function archiveGame() {
@@ -506,4 +537,3 @@ function copyWA() {
 </script>
 </body>
 </html>
-
