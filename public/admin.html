@@ -116,6 +116,8 @@
   .error { padding:10px 12px; background:var(--red-light); border-radius:var(--radius-sm); font-size:13px; color:#991B1B; margin-bottom:10px; }
   .success { padding:10px 12px; background:var(--green-light); border-radius:var(--radius-sm); font-size:13px; color:var(--green-dark); margin-bottom:10px; }
 </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -227,6 +229,13 @@
         <div class="wa-box" id="wa-text"></div>
         <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="copyWA()">Kopieren</button>
       </div>
+    </div>
+    <div class="card" id="map-card" style="display:none">
+      <div class="card-title">&#x1F5FA;&#xFE0F; Routenu&#776;bersicht</div>
+      <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">
+        &#x1F697; Fahrer &nbsp;&middot;&nbsp; &#x1F464; Mitfahrer &nbsp;&middot;&nbsp; &#x26BD; Zielort &nbsp;&middot;&nbsp; Farben = Gruppen
+      </div>
+      <div id="route-map" style="height:440px;border-radius:10px;border:1px solid var(--gray-200);overflow:hidden"></div>
     </div>
   </div>
 </div>
@@ -553,8 +562,18 @@ async function publishGroups() {
   renderCurrentGame(); toast('✓ Ergebnis veröffentlicht – alle Eltern sehen es jetzt!');
 }
 
+// Map instance
+let routeMap = null;
+
+// Palette matching GROUP_COLORS
+const MAP_COLORS = ['#CC0000','#16A34A','#2563EB','#7C3AED','#D97706','#0891B2'];
+
 function renderGroupsResult() {
-  if(!assignments.length){ document.getElementById('groups-result').innerHTML='<div style="color:var(--gray-400);font-size:13px">Noch nicht berechnet</div>'; return; }
+  if(!assignments.length){
+    document.getElementById('groups-result').innerHTML='<div style="color:var(--gray-400);font-size:13px">Noch nicht berechnet</div>';
+    document.getElementById('map-card').style.display='none';
+    return;
+  }
   const playerMap=Object.fromEntries([...players,...lineup].map(p=>[p.id,p]));
   let html='', wa='⚽ Fahrgemeinschaften\n';
   if(currentGame) wa+=`${currentGame.destination_name} · ${new Date(currentGame.date).toLocaleDateString('de-DE')}\n\n`;
@@ -579,6 +598,84 @@ function renderGroupsResult() {
   document.getElementById('wa-text').textContent=wa.trim();
   document.getElementById('publish-btn').style.display = currentGame?.status==='calculated'?'inline-flex':'none';
   document.getElementById('wa-section').style.display = assignments.length?'block':'none';
+
+  // Render map
+  renderRouteMap(playerMap);
+}
+
+function makeIcon(emoji, color) {
+  return L.divIcon({
+    html: `<div style="background:${color};width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${emoji}</div>`,
+    iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-18], className:''
+  });
+}
+
+function renderRouteMap(playerMap) {
+  document.getElementById('map-card').style.display='block';
+  // Destroy old map
+  if(routeMap){ routeMap.remove(); routeMap=null; }
+
+  routeMap = L.map('route-map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap', maxZoom:18
+  }).addTo(routeMap);
+
+  const bounds = [];
+
+  // Destination marker
+  if(currentGame?.dest_lat && currentGame?.dest_lng){
+    const destLatLng = [currentGame.dest_lat, currentGame.dest_lng];
+    L.marker(destLatLng, { icon: makeIcon('⚽','#1F2937') })
+      .bindPopup(`<b>Ziel: ${currentGame.destination_name}</b><br>${currentGame.destination_address}`)
+      .addTo(routeMap);
+    bounds.push(destLatLng);
+  }
+
+  assignments.forEach((a, i) => {
+    const color = MAP_COLORS[i % MAP_COLORS.length];
+    const driver = playerMap[a.driver_player_id];
+    const riderObjects = (a.rider_player_ids||[]).map(id=>playerMap[id]).filter(Boolean);
+    const routePoints = [];
+
+    // Driver marker
+    if(driver?.lat && driver?.lng){
+      const dLatLng = [driver.lat, driver.lng];
+      L.marker(dLatLng, { icon: makeIcon('🚗', color) })
+        .bindPopup(`<b>Gruppe ${i+1} – Fahrer</b><br>${driver.name}<br><span style="font-size:11px;color:#666">${driver.address||''}</span>`)
+        .addTo(routeMap);
+      bounds.push(dLatLng);
+      routePoints.push(dLatLng);
+    }
+
+    // Rider markers
+    riderObjects.forEach(rider => {
+      if(rider?.lat && rider?.lng){
+        const rLatLng = [rider.lat, rider.lng];
+        L.marker(rLatLng, { icon: makeIcon('👤', color) })
+          .bindPopup(`<b>Gruppe ${i+1} – Mitfahrer</b><br>${rider.name}<br><span style="font-size:11px;color:#666">${rider.address||''}</span>`)
+          .addTo(routeMap);
+        bounds.push(rLatLng);
+        routePoints.push(rLatLng);
+      }
+    });
+
+    // Destination
+    if(currentGame?.dest_lat && currentGame?.dest_lng){
+      routePoints.push([currentGame.dest_lat, currentGame.dest_lng]);
+    }
+
+    // Draw route line
+    if(routePoints.length >= 2){
+      L.polyline(routePoints, {
+        color, weight:3, opacity:0.75, dashArray:'6,4'
+      }).bindPopup(`Gruppe ${i+1}: ${driver?.name||'?'}`).addTo(routeMap);
+    }
+  });
+
+  // Fit map to all markers
+  if(bounds.length > 0){
+    routeMap.fitBounds(bounds, { padding:[30,30] });
+  }
 }
 
 function copyWA() {
