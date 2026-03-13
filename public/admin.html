@@ -193,12 +193,16 @@
         <div class="form-group"><label>Adresse Spielort</label><input id="g-addr" placeholder="Griesheimer Weg 45, Griesheim"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Datum & Anstoß</label><input type="datetime-local" id="g-date"></div>
+        <div class="form-group"><label>Datum & Anstoß</label><input type="datetime-local" id="g-date" oninput="autoDeadline('g-date','g-deadline')"></div>
         <div class="form-group"><label>Anmeldeschluss</label><input type="datetime-local" id="g-deadline"></div>
       </div>
       <div class="form-group" style="margin-bottom:12px">
         <label>Aufstellung (Spieler auswählen)</label>
-        <div class="lineup-grid" id="lineup-grid" style="margin-top:8px"></div>
+        <div style="display:flex;gap:6px;margin:6px 0 4px">
+          <button type="button" class="btn btn-outline btn-sm" onclick="selectAllLineup('lineup-grid')">Alle auswählen</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="deselectAllLineup('lineup-grid')">Alle abwählen</button>
+        </div>
+        <div class="lineup-grid" id="lineup-grid" style="margin-top:4px"></div>
       </div>
       <div id="game-err" class="error" style="display:none"></div>
       <button class="btn btn-primary" id="game-btn" onclick="createGame()">Spiel speichern</button>
@@ -246,6 +250,7 @@
 const API = window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api';
 let adminToken = localStorage.getItem('admin_token') || '';
 let players = [], currentGame = null, lineup = [], rsvps = [], assignments = [];
+let editLineupSelection = new Set();
 
 const GROUP_COLORS = [
   { bg:'#FFF0F0', border:'#FFAAAA', title:'#880000' },
@@ -477,9 +482,10 @@ function renderCurrentGame() {
 
   // Aufstellung checkboxes
   const lineupIds = new Set(lineup.map(p=>p.id));
+  editLineupSelection = new Set(lineupIds);
   const lineupCheckboxes = players.map(p=>`
     <label class="lineup-item">
-      <input type="checkbox" value="${p.id}" ${lineupIds.has(p.id)?'checked':''}>
+      <input type="checkbox" value="${p.id}" ${lineupIds.has(p.id)?'checked':''} onchange="toggleEditLineup(this)">
       ${p.name} ${p.has_car?'🚗':''}
     </label>`).join('');
 
@@ -493,13 +499,17 @@ function renderCurrentGame() {
     </div>
     <div class="form-row">
       <div class="form-group"><label>Datum & Anstoß</label>
-        <input type="datetime-local" id="eg-date" value="${isoToLocal(currentGame.date)}"></div>
+        <input type="datetime-local" id="eg-date" value="${isoToLocal(currentGame.date)}" oninput="autoDeadline('eg-date','eg-deadline')"></div>
       <div class="form-group"><label>Anmeldeschluss</label>
         <input type="datetime-local" id="eg-deadline" value="${isoToLocal(currentGame.rsvp_deadline)}"></div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label>Aufstellung</label>
-      <div class="lineup-grid" id="current-lineup-grid" style="margin-top:6px">${lineupCheckboxes}</div>
+      <div style="display:flex;gap:6px;margin:6px 0 4px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="selectAllLineup('current-lineup-grid')">Alle auswählen</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="deselectAllLineup('current-lineup-grid')">Alle abwählen</button>
+      </div>
+      <div class="lineup-grid" id="current-lineup-grid" style="margin-top:4px">${lineupCheckboxes}</div>
     </div>
     <div id="edit-game-err" class="error" style="display:none"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -520,7 +530,7 @@ async function saveGameEdits() {
   errEl.style.display='none';
   if(!name||!addr||!dateRaw){ errEl.textContent='Bitte alle Pflichtfelder ausfüllen'; errEl.style.display='block'; return; }
 
-  const player_ids = [...document.querySelectorAll('#current-lineup-grid input:checked')].map(i=>i.value);
+  const player_ids = [...editLineupSelection];
   const btn = document.getElementById('edit-game-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Speichert…';
 
@@ -737,6 +747,37 @@ function renderRouteMap(playerMap) {
 function copyWA() {
   navigator.clipboard?.writeText(document.getElementById('wa-text').textContent);
   toast('✓ WhatsApp-Text kopiert');
+}
+
+// ── Lineup helpers ────────────────────────────────────────────────────
+function toggleEditLineup(cb) {
+  if (cb.checked) editLineupSelection.add(cb.value);
+  else editLineupSelection.delete(cb.value);
+}
+
+function selectAllLineup(gridId) {
+  document.querySelectorAll(`#${gridId} input[type=checkbox]`).forEach(cb => {
+    cb.checked = true;
+    if (gridId === 'current-lineup-grid') editLineupSelection.add(cb.value);
+  });
+}
+
+function deselectAllLineup(gridId) {
+  document.querySelectorAll(`#${gridId} input[type=checkbox]`).forEach(cb => {
+    cb.checked = false;
+    if (gridId === 'current-lineup-grid') editLineupSelection.delete(cb.value);
+  });
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────
+function autoDeadline(dateId, deadlineId) {
+  const val = document.getElementById(dateId).value;
+  if (!val) return;
+  const d = new Date(val);
+  d.setDate(d.getDate() - 1);
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById(deadlineId).value =
+    `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
