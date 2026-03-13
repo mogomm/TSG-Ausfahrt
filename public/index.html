@@ -8,9 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --orange: #EC6500;
-    --orange-light: #FFF3E8;
-    --orange-dark: #B34A00;
+    --orange: #CC0000;
+    --orange-light: #FFF0F0;
+    --orange-dark: #990000;
     --green: #22C55E;
     --green-light: #F0FDF4;
     --green-dark: #166534;
@@ -41,12 +41,12 @@
   .header-sub { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 1px; }
   
   /* ── Game banner ── */
-  .game-banner { background: var(--orange-light); border-bottom: 1px solid #F0C080; padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  .game-dest { font-size: 15px; font-weight: 600; color: #7A3800; }
-  .game-meta { font-size: 12px; color: #A05000; margin-top: 2px; }
+  .game-banner { background: var(--orange-light); border-bottom: 1px solid #FFAAAA; padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .game-dest { font-size: 15px; font-weight: 600; color: #880000; }
+  .game-meta { font-size: 12px; color: #AA0000; margin-top: 2px; }
   .game-time { text-align: right; }
-  .game-time-label { font-size: 10px; color: #A05000; text-transform: uppercase; letter-spacing: 0.05em; }
-  .game-time-value { font-size: 18px; font-weight: 600; color: #7A3800; }
+  .game-time-label { font-size: 10px; color: #AA0000; text-transform: uppercase; letter-spacing: 0.05em; }
+  .game-time-value { font-size: 18px; font-weight: 600; color: #880000; }
   
   /* ── Deadline banner ── */
   .deadline { background: var(--red-light); border-bottom: 1px solid #FCA5A5; padding: 8px 16px; font-size: 12px; color: #991B1B; display: flex; align-items: center; gap: 6px; }
@@ -66,7 +66,7 @@
   .avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; font-family: 'DM Mono', monospace; }
   .player-name { font-size: 16px; font-weight: 600; color: var(--gray-800); }
   .player-addr { font-size: 11px; color: var(--gray-400); margin-top: 1px; }
-  .me-badge { display: inline-block; font-size: 10px; font-weight: 500; background: #FFF0E0; color: var(--orange); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .me-badge { display: inline-block; font-size: 10px; font-weight: 500; background: #FFF0F0; color: var(--orange); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
   
   /* ── Controls ── */
   .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -94,8 +94,8 @@
   .note-area:focus { outline: none; border-color: var(--orange); }
   
   /* ── Assignment strip ── */
-  .assign-strip { margin-top: 10px; padding: 10px 12px; background: #FFFBEB; border-radius: var(--radius-sm); border: 1px solid #FCD34D; font-size: 13px; color: #92400E; line-height: 1.6; }
-  .assign-strip b { font-weight: 600; color: #7A3800; }
+  .assign-strip { margin-top: 10px; padding: 10px 12px; background: #FFF0F0; border-radius: var(--radius-sm); border: 1px solid #FFAAAA; font-size: 13px; color: #880000; line-height: 1.6; }
+  .assign-strip b { font-weight: 600; color: #660000; }
   
   /* ── Save button ── */
   .save-btn { width: 100%; margin-top: 12px; padding: 11px; background: var(--orange); color: white; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s; }
@@ -216,9 +216,10 @@ let assignments = [];
 function render() {
   if (!game) {
     app.innerHTML = `
-      <div class="header"><div class="header-ball">⚽</div>
+      <div class="header">
+        <img src="https://next.fussball.de/_next/image?url=https:%2F%2Fwww.fussball.de%2Fprofile-service%2Fv1%2Fclub-profile%2F00ES8GN9V800001LVV0AG08LVUPGND5I%2Flogo&w=640&q=100" alt="TSG Logo" style="width:36px;height:36px;object-fit:contain;flex-shrink:0;">
         <div><div class="header-title">Fahrgemeinschaft</div>
-        <div class="header-sub">FC Jugend</div></div></div>
+        <div class="header-sub">TSG Darmstadt</div></div></div>
       <div class="no-game">
         <div class="no-game-icon">🗓️</div>
         <div class="no-game-title">Kein Spiel geplant</div>
@@ -237,9 +238,9 @@ function render() {
 
   let html = `
     <div class="header">
-      <div class="header-ball">⚽</div>
+      <img src="https://next.fussball.de/_next/image?url=https:%2F%2Fwww.fussball.de%2Fprofile-service%2Fv1%2Fclub-profile%2F00ES8GN9V800001LVV0AG08LVUPGND5I%2Flogo&w=640&q=100" alt="TSG Logo" style="width:36px;height:36px;object-fit:contain;flex-shrink:0;">
       <div><div class="header-title">Fahrgemeinschaft</div>
-      <div class="header-sub">FC Jugend</div></div>
+      <div class="header-sub">TSG Darmstadt</div></div>
     </div>
     <div class="game-banner">
       <div>
@@ -504,4 +505,3 @@ init();
 </script>
 </body>
 </html>
-
