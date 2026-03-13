@@ -369,14 +369,33 @@ function copyLink(token, name) {
 }
 
 // ── Game ──────────────────────────────────────────────────────────────
+
+// Converts a datetime-local string (no timezone) to ISO string in Europe/Berlin time
+function localToISO(dtLocal) {
+  if (!dtLocal) return null;
+  // dtLocal = "2025-03-15T20:00" → treat as Europe/Berlin local time
+  // We create a date in the local browser timezone, then correct to Berlin
+  const d = new Date(dtLocal);
+  // Get Berlin offset in minutes at that moment
+  const berlinOffset = new Date(dtLocal).toLocaleString('en-US', { timeZone: 'Europe/Berlin', timeZoneName: 'shortOffset' });
+  const match = berlinOffset.match(/GMT([+-]\d+)/);
+  const offsetHours = match ? parseInt(match[1]) : 1;
+  // Subtract browser offset, add Berlin offset
+  const browserOffset = -d.getTimezoneOffset(); // minutes, positive = east
+  const correctionMs = (offsetHours * 60 - browserOffset) * 60000;
+  return new Date(d.getTime() - correctionMs).toISOString();
+}
+
 async function createGame() {
   const name=document.getElementById('g-name').value.trim();
   const addr=document.getElementById('g-addr').value.trim();
-  const date=document.getElementById('g-date').value;
-  const deadline=document.getElementById('g-deadline').value;
+  const dateRaw=document.getElementById('g-date').value;
+  const deadlineRaw=document.getElementById('g-deadline').value;
   const errEl=document.getElementById('game-err');
   errEl.style.display='none';
-  if(!name||!addr||!date){ errEl.textContent='Bitte alle Pflichtfelder ausfüllen'; errEl.style.display='block'; return; }
+  if(!name||!addr||!dateRaw){ errEl.textContent='Bitte alle Pflichtfelder ausfüllen'; errEl.style.display='block'; return; }
+  const date = localToISO(dateRaw);
+  const deadline = localToISO(deadlineRaw);
   const player_ids=[...document.querySelectorAll('#lineup-grid input:checked')].map(i=>i.value);
   const btn=document.getElementById('game-btn');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Geocodiere…';
@@ -387,57 +406,101 @@ async function createGame() {
   btn.disabled=false; btn.textContent='Spiel speichern';
 }
 
+// Convert ISO timestamp to datetime-local input value in Berlin time
+function isoToLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const berlin = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const pad = n => String(n).padStart(2,'0');
+  return `${berlin.getFullYear()}-${pad(berlin.getMonth()+1)}-${pad(berlin.getDate())}T${pad(berlin.getHours())}:${pad(berlin.getMinutes())}`;
+}
+
 function renderCurrentGame() {
   if(!currentGame) { document.getElementById('current-game-card').style.display='none'; return; }
   document.getElementById('current-game-card').style.display='block';
   const statusBadge = {open:'badge-orange',calculated:'badge-blue',published:'badge-green',archived:'badge-gray'}[currentGame.status]||'badge-gray';
   const statusLabel = {open:'Offen',calculated:'Berechnet',published:'Veröffentlicht',archived:'Archiviert'}[currentGame.status]||currentGame.status;
-  const d=new Date(currentGame.date);
-  document.getElementById('current-game-info').innerHTML=`
-    <div style="font-size:15px;font-weight:600">${currentGame.destination_name}</div>
-    <div style="font-size:13px;color:var(--gray-600);margin-top:2px">${currentGame.destination_address}</div>
-    <div style="font-size:13px;color:var(--gray-600);margin-top:4px">${d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})} · ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</div>
-    <div style="margin-top:8px"><span class="badge ${statusBadge}">${statusLabel}</span>
-    <span style="font-size:12px;color:var(--gray-400);margin-left:8px">${lineup.length} Spieler in der Aufstellung</span></div>`;
 
-  // Aufstellung bearbeiten
+  // Aufstellung checkboxes
   const lineupIds = new Set(lineup.map(p=>p.id));
   const lineupCheckboxes = players.map(p=>`
     <label class="lineup-item">
-      <input type="checkbox" value="${p.id}" ${lineupIds.has(p.id)?'checked':''} onchange="updateLineup()">
+      <input type="checkbox" value="${p.id}" ${lineupIds.has(p.id)?'checked':''}>
       ${p.name} ${p.has_car?'🚗':''}
     </label>`).join('');
-  document.getElementById('current-game-info').innerHTML += `
-    <div style="margin-top:14px;border-top:1px solid var(--gray-200);padding-top:12px">
-      <div style="font-size:12px;font-weight:600;color:var(--gray-600);margin-bottom:8px">Aufstellung bearbeiten</div>
-      <div class="lineup-grid" id="current-lineup-grid">${lineupCheckboxes}</div>
-      <button class="btn btn-primary" style="margin-top:10px" id="lineup-save-btn" onclick="saveLineup()">Aufstellung speichern</button>
-      <span id="lineup-saved-msg" style="display:none;font-size:12px;color:var(--green-dark);margin-left:10px">✓ Gespeichert</span>
+
+  document.getElementById('current-game-info').innerHTML=`
+    <div style="margin-bottom:6px"><span class="badge ${statusBadge}">${statusLabel}</span></div>
+    <div class="form-row">
+      <div class="form-group"><label>Gegner / Ort</label>
+        <input id="eg-name" value="${currentGame.destination_name}"></div>
+      <div class="form-group"><label>Adresse Spielort</label>
+        <input id="eg-addr" value="${currentGame.destination_address}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Datum & Anstoß</label>
+        <input type="datetime-local" id="eg-date" value="${isoToLocal(currentGame.date)}"></div>
+      <div class="form-group"><label>Anmeldeschluss</label>
+        <input type="datetime-local" id="eg-deadline" value="${isoToLocal(currentGame.rsvp_deadline)}"></div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>Aufstellung</label>
+      <div class="lineup-grid" id="current-lineup-grid" style="margin-top:6px">${lineupCheckboxes}</div>
+    </div>
+    <div id="edit-game-err" class="error" style="display:none"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="edit-game-btn" onclick="saveGameEdits()">Spiel speichern</button>
+      <span id="edit-game-msg" style="display:none;font-size:12px;color:var(--green-dark)">✓ Gespeichert</span>
     </div>`;
 
   const actions=document.getElementById('game-actions');
-  actions.innerHTML='';
-  if(currentGame.status==='open'||currentGame.status==='calculated'){
-    actions.innerHTML=`<button class="btn btn-outline" onclick="archiveGame()">Spiel archivieren</button>`;
-  } else if(currentGame.status==='published') {
-    actions.innerHTML=`<button class="btn btn-outline" onclick="archiveGame()">Archivieren</button>`;
-  }
+  actions.innerHTML=`<button class="btn btn-outline" style="margin-top:4px" onclick="archiveGame()">Spiel archivieren</button>`;
 }
 
-async function saveLineup() {
-  const checked = [...document.querySelectorAll('#current-lineup-grid input:checked')].map(i=>i.value);
-  const btn = document.getElementById('lineup-save-btn');
-  btn.disabled=true; btn.textContent='Speichert…';
+async function saveGameEdits() {
+  const name = document.getElementById('eg-name').value.trim();
+  const addr = document.getElementById('eg-addr').value.trim();
+  const dateRaw = document.getElementById('eg-date').value;
+  const deadlineRaw = document.getElementById('eg-deadline').value;
+  const errEl = document.getElementById('edit-game-err');
+  errEl.style.display='none';
+  if(!name||!addr||!dateRaw){ errEl.textContent='Bitte alle Pflichtfelder ausfüllen'; errEl.style.display='block'; return; }
+
+  const player_ids = [...document.querySelectorAll('#current-lineup-grid input:checked')].map(i=>i.value);
+  const btn = document.getElementById('edit-game-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Speichert…';
+
   try {
-    await api(`/games/${currentGame.id}`,'PATCH',{ player_ids: checked });
+    // Check if address changed → re-geocode
+    const addrChanged = addr !== currentGame.destination_address;
+    let extraFields = {};
+    if (addrChanged) {
+      btn.innerHTML='<span class="spinner"></span> Geocodiere neue Adresse…';
+      // Re-geocode via creating a temp game object – we call the patch endpoint
+      // which doesn't geocode, so we do it client-side via a dedicated approach:
+      // simplest: send new address in patch and handle in backend
+      extraFields = { destination_address: addr, destination_name: name };
+    }
+
+    await api(`/games/${currentGame.id}`, 'PATCH', {
+      destination_name: name,
+      destination_address: addrChanged ? addr : undefined,
+      date: localToISO(dateRaw),
+      rsvp_deadline: deadlineRaw ? localToISO(deadlineRaw) : null,
+      player_ids
+    });
+
+    currentGame = await api('/games/current');
     lineup = await api(`/games/${currentGame.id}/lineup`);
     renderRsvpOverview();
-    const msg = document.getElementById('lineup-saved-msg');
-    if(msg){ msg.style.display='inline'; setTimeout(()=>msg.style.display='none', 2500); }
-    toast('✓ Aufstellung gespeichert');
-  } catch(e){ toast(e.message, false); }
-  btn.disabled=false; btn.textContent='Aufstellung speichern';
+    const msg = document.getElementById('edit-game-msg');
+    if(msg){ msg.style.display='inline'; setTimeout(()=>{ msg.style.display='none'; },2500); }
+    toast('✓ Spiel gespeichert');
+  } catch(e){ errEl.textContent=e.message; errEl.style.display='block'; }
+  btn.disabled=false; btn.textContent='Spiel speichern';
 }
+
+
 
 async function archiveGame() {
   await api(`/games/${currentGame.id}`,'PATCH',{status:'archived'});
