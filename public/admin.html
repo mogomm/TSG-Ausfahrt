@@ -322,17 +322,62 @@ function switchTab(name) {
 function renderPlayersTable() {
   document.getElementById('player-count').textContent = `(${players.length})`;
   const tbody = document.getElementById('players-table');
-  if (!players.length) { tbody.innerHTML='<tr><td colspan="5" style="color:var(--gray-400);text-align:center;padding:20px">Noch keine Spieler</td></tr>'; return; }
+  if (!players.length) { tbody.innerHTML='<tr><td colspan="6" style="color:var(--gray-400);text-align:center;padding:20px">Noch keine Spieler</td></tr>'; return; }
   tbody.innerHTML = players.map(p => `
-    <tr>
+    <tr id="row-${p.id}">
       <td style="font-weight:500">${p.name}</td>
-      <td style="color:var(--gray-600)">${p.address}</td>
+      <td style="color:var(--gray-600);font-size:13px">${p.address}</td>
       <td><span class="badge ${p.has_car?'badge-green':'badge-gray'}">${p.has_car?'🚗 Ja':'Nein'}</span></td>
       <td><span class="link-pill" onclick="copyLink('${p.magic_token}','${p.name}')" title="Link kopieren">
         /player?token=${p.magic_token.slice(0,8)}…
       </span></td>
+      <td><button class="btn btn-outline btn-sm" onclick="startEditPlayer('${p.id}')">✏️</button></td>
       <td><button class="btn btn-outline btn-sm" onclick="deletePlayer('${p.id}','${p.name}')">✕</button></td>
+    </tr>
+    <tr id="edit-row-${p.id}" style="display:none;background:var(--gray-50)">
+      <td colspan="6" style="padding:10px 8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin:0;flex:1;min-width:120px"><label style="font-size:11px">Name</label>
+            <input id="ep-name-${p.id}" value="${p.name.replace(/"/g,'&quot;')}" style="padding:6px 8px;font-size:13px"></div>
+          <div class="form-group" style="margin:0;flex:2;min-width:200px"><label style="font-size:11px">Adresse</label>
+            <input id="ep-addr-${p.id}" value="${p.address.replace(/"/g,'&quot;')}" style="padding:6px 8px;font-size:13px"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Telefon</label>
+            <input id="ep-phone-${p.id}" value="${(p.phone||'').replace(/"/g,'&quot;')}" style="padding:6px 8px;font-size:13px;width:130px"></div>
+          <div class="form-group" style="margin:0"><label style="font-size:11px">Auto</label>
+            <select id="ep-car-${p.id}" style="padding:6px 8px;font-size:13px">
+              <option value="1" ${p.has_car?'selected':''}>Ja</option>
+              <option value="0" ${!p.has_car?'selected':''}>Nein</option>
+            </select></div>
+          <button class="btn btn-primary btn-sm" onclick="saveEditPlayer('${p.id}')">Speichern</button>
+          <button class="btn btn-outline btn-sm" onclick="cancelEditPlayer('${p.id}')">Abbrechen</button>
+          <span id="ep-err-${p.id}" style="color:var(--red);font-size:12px;display:none"></span>
+        </div>
+      </td>
     </tr>`).join('');
+}
+
+function startEditPlayer(id) {
+  document.getElementById(`edit-row-${id}`).style.display='table-row';
+  document.getElementById(`ep-name-${id}`).focus();
+}
+function cancelEditPlayer(id) {
+  document.getElementById(`edit-row-${id}`).style.display='none';
+}
+async function saveEditPlayer(id) {
+  const name  = document.getElementById(`ep-name-${id}`).value.trim();
+  const addr  = document.getElementById(`ep-addr-${id}`).value.trim();
+  const phone = document.getElementById(`ep-phone-${id}`).value.trim();
+  const has_car = document.getElementById(`ep-car-${id}`).value === '1';
+  const errEl = document.getElementById(`ep-err-${id}`);
+  errEl.style.display='none';
+  if (!name||!addr){ errEl.textContent='Name und Adresse erforderlich'; errEl.style.display='inline'; return; }
+  const player = players.find(p=>p.id===id);
+  const addrChanged = addr !== player?.address;
+  try {
+    await api(`/players/${id}`,'PATCH',{ name, address: addr, phone, has_car, regeocode: addrChanged });
+    await loadAll();
+    toast(`✓ ${name} gespeichert`);
+  } catch(e){ errEl.textContent=e.message; errEl.style.display='inline'; }
 }
 
 function renderLineupGrid() {
@@ -521,20 +566,31 @@ function renderRsvpOverview() {
   if(!currentGame || !lineup.length){ document.getElementById('rsvp-overview').innerHTML='<div style="color:var(--gray-400);font-size:13px">Kein aktives Spiel</div>'; return; }
   const rsvpMap=Object.fromEntries(rsvps.map(r=>[r.player_id,r]));
   const rows=lineup.map(p=>{
-    const r=rsvpMap[p.id]||{mode:'pending'};
-    const badge={
-      driving:`<span class="badge badge-green">🚗 fährt · ${r.seats_available||2} Plätze</span>`,
-      riding:`<span class="badge badge-blue">🙋 sucht ${r.seats_needed||1} Platz</span>`,
-      pending:`<span class="badge badge-gray">– offen</span>`
-    }[r.mode];
+    const r=rsvpMap[p.id];
+    const mode=r?.mode||'pending';
+    let badge, defaultHint='';
+    if(mode==='driving'){
+      badge=`<span class="badge badge-green">🚗 fährt · ${r.seats_available||2} Plätze</span>`;
+    } else if(mode==='riding'){
+      badge=`<span class="badge badge-blue">🙋 sucht ${r.seats_needed||1} Platz</span>`;
+    } else {
+      // pending: show what the algorithm will assume as default
+      if(p.has_car){
+        badge=`<span class="badge badge-gray">– offen</span>`;
+        defaultHint=`<span title="Default bei Berechnung" style="font-size:11px;color:#92400E;background:#FEF3C7;border-radius:4px;padding:1px 5px;margin-left:5px">Default: 🚗 Fahrer · 2 Plätze</span>`;
+      } else {
+        badge=`<span class="badge badge-gray">– offen</span>`;
+        defaultHint=`<span title="Default bei Berechnung" style="font-size:11px;color:#1E40AF;background:#DBEAFE;border-radius:4px;padding:1px 5px;margin-left:5px">Default: 🙋 Mitfahrer · 1 Platz</span>`;
+      }
+    }
     return `<tr>
       <td style="font-weight:500">${p.name}</td>
-      <td>${badge}</td>
-      <td style="font-size:12px;color:var(--gray-400);font-style:italic">${r.note||''}</td>
+      <td>${badge}${defaultHint}</td>
+      <td style="font-size:12px;color:var(--gray-400);font-style:italic">${r?.note||''}</td>
     </tr>`;
   });
   document.getElementById('rsvp-overview').innerHTML=`<div class="table-wrap"><table>
-    <thead><tr><th>Spieler</th><th>Status</th><th>Notiz</th></tr></thead>
+    <thead><tr><th>Spieler</th><th>Status / Default</th><th>Notiz</th></tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table></div>`;
 }
