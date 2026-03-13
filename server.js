@@ -255,9 +255,19 @@ app.patch('/api/games/:id', async (req, res) => {
     }
   }
 
-  const { data, error } = await supabase
-    .from('games').update(updates).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  // Only run UPDATE if there's something to update
+  let game;
+  if (Object.keys(updates).length > 0) {
+    const { data, error } = await supabase
+      .from('games').update(updates).eq('id', req.params.id).select().maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    game = data;
+  } else {
+    const { data, error } = await supabase
+      .from('games').select('*').eq('id', req.params.id).maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    game = data;
+  }
 
   if (player_ids !== undefined) {
     await supabase.from('lineups').delete().eq('game_id', req.params.id);
@@ -267,7 +277,7 @@ app.patch('/api/games/:id', async (req, res) => {
       );
     }
   }
-  res.json(data);
+  res.json(game);
 });
 
 // ── Lineup for a game ─────────────────────────────────────────────────────────
